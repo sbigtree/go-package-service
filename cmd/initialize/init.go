@@ -1,7 +1,7 @@
 package initialize
 
 import (
-	"go-tmp/cmd/initialize/event"
+	"github.com/sbigtree/go-package-service/cmd/initialize/event"
 )
 
 func init() {

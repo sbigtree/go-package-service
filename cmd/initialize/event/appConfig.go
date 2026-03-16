@@ -3,8 +3,8 @@ package event
 import (
 	"encoding/base64"
 	"encoding/json"
-	"go-tmp/cmd/global"
-	"go-tmp/core/tools"
+	"github.com/sbigtree/go-package-service/cmd/global"
+	"github.com/sbigtree/go-package-service/core/tools"
 	"os"
 	"strings"
 

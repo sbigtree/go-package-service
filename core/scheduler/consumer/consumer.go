@@ -3,9 +3,9 @@ package consumer
 import (
 	"context"
 	"github.com/google/uuid"
-	"go-tmp/cmd/global"
-	"go-tmp/core/event"
-	consumer_test "go-tmp/core/scheduler/consumer/test"
+	"github.com/sbigtree/go-package-service/cmd/global"
+	"github.com/sbigtree/go-package-service/core/event"
+	consumer_test "github.com/sbigtree/go-package-service/core/scheduler/consumer/test"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"

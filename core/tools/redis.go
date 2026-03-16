@@ -2,7 +2,7 @@ package tools
 
 import (
 	"context"
-	"go-tmp/cmd/global"
+	"github.com/sbigtree/go-package-service/cmd/global"
 	"time"
 
 	"go.uber.org/zap"

@@ -1,7 +1,7 @@
 package event
 
 import (
-	"go-tmp/cmd/global"
+	"github.com/sbigtree/go-package-service/cmd/global"
 	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8"

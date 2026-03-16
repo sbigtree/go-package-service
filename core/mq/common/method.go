@@ -3,7 +3,7 @@ package mq_common
 import (
 	"context"
 	"encoding/json"
-	"go-tmp/cmd/global"
+	"github.com/sbigtree/go-package-service/cmd/global"
 
 	"github.com/apache/rocketmq-client-go/v2/primitive"
 	"go.uber.org/zap"

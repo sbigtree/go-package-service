@@ -3,7 +3,7 @@ package event
 import (
 	"context"
 	"fmt"
-	"go-tmp/cmd/global"
+	"github.com/sbigtree/go-package-service/cmd/global"
 	"net/url"
 	"time"
 

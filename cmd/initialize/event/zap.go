@@ -1,8 +1,8 @@
 package event
 
 import (
-	"go-tmp/cmd/global"
-	"go-tmp/core/tools"
+	"github.com/sbigtree/go-package-service/cmd/global"
+	"github.com/sbigtree/go-package-service/core/tools"
 	"os"
 
 	"go.uber.org/zap"

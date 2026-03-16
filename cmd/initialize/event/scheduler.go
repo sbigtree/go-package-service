@@ -1,8 +1,8 @@
 package event
 
 import (
-	"go-tmp/cmd/global"
-	"go-tmp/core/scheduler"
+	"github.com/sbigtree/go-package-service/cmd/global"
+	"github.com/sbigtree/go-package-service/core/scheduler"
 
 	"github.com/robfig/cron/v3"
 	"go.uber.org/zap"

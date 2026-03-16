@@ -3,7 +3,7 @@ package mysql_methods
 import (
 	"context"
 	"fmt"
-	"go-tmp/cmd/global"
+	"github.com/sbigtree/go-package-service/cmd/global"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )

@@ -4,9 +4,9 @@ import (
 	"context"
 	"github.com/apache/rocketmq-client-go/v2/consumer"
 	"github.com/apache/rocketmq-client-go/v2/primitive"
-	"go-tmp/cmd/global"
-	"go-tmp/core/event"
-	"go-tmp/core/store/mq"
+	"github.com/sbigtree/go-package-service/cmd/global"
+	"github.com/sbigtree/go-package-service/core/event"
+	"github.com/sbigtree/go-package-service/core/store/mq"
 	"go.uber.org/zap"
 	"runtime/debug"
 )

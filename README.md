@@ -52,7 +52,7 @@
 
 ```text
 
-go-tmp/
+github.com/sbigtree/go-package-service/
 ├── cmd/ # 项目入口目录
 │ ├── appconf/ # 项目配置结构体定义（用于映射配置文件）
 │ │ └── appconfig.go

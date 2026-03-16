@@ -2,7 +2,7 @@ package event
 
 import (
 	"github.com/apache/rocketmq-client-go/v2/rlog"
-	"go-tmp/cmd/global"
+	"github.com/sbigtree/go-package-service/cmd/global"
 	"os"
 	"path/filepath"
 	"strconv"

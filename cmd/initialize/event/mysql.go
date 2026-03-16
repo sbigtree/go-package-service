@@ -3,7 +3,7 @@ package event
 import (
 	"database/sql"
 	"fmt"
-	"go-tmp/cmd/global"
+	"github.com/sbigtree/go-package-service/cmd/global"
 	"time"
 
 	"go.uber.org/zap"

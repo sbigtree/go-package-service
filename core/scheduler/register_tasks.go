@@ -1,8 +1,8 @@
 package scheduler
 
 import (
-	"go-tmp/cmd/global"
-	"go-tmp/core/scheduler/jobs/test"
+	"github.com/sbigtree/go-package-service/cmd/global"
+	"github.com/sbigtree/go-package-service/core/scheduler/jobs/test"
 	"log"
 )
 

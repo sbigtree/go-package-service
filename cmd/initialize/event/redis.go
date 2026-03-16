@@ -1,7 +1,7 @@
 package event
 
 import (
-	"go-tmp/cmd/global"
+	"github.com/sbigtree/go-package-service/cmd/global"
 	"strconv"
 
 	"github.com/go-redis/redis"

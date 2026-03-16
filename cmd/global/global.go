@@ -1,7 +1,7 @@
 package global
 
 import (
-	"go-tmp/cmd/appconf"
+	"github.com/sbigtree/go-package-service/cmd/appconf"
 	"os"
 	"sync"
 

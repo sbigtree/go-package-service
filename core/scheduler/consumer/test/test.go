@@ -2,7 +2,7 @@ package consumer_test
 
 import (
 	"fmt"
-	"go-tmp/core/event"
+	"github.com/sbigtree/go-package-service/core/event"
 )
 
 func Test1(req event.EventMsg) error {

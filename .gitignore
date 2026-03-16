@@ -36,3 +36,6 @@ app
 
 .idea/
 .vscode
+logs/
+tmp/
+.idea/

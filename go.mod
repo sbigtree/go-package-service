@@ -1,4 +1,4 @@
-module go-tmp
+module github.com/sbigtree/go-package-service
 
 go 1.24.1
 
