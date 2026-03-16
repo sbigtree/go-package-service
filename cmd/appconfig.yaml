@@ -1,0 +1,13 @@
+nacos:
+  address: ${NAMESPACE}
+  IP: ${NACOS_IP}
+  port: ${NACOS_PORT}
+  user: ${NACOS_USERNAME}
+  pass: ${NACOS_PASSWORD}
+  dataId: ${NACOS_DATAID}
+  group: ${NACOS_GROUP}
+  key: ${CONFIG_AES_KEY}
+
+port: 6666
+
+
