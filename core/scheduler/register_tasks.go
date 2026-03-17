@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"github.com/sbigtree/go-package-service/cmd/global"
+	"github.com/sbigtree/go-package-service/core/scheduler/jobs/mypackage"
 	"github.com/sbigtree/go-package-service/core/scheduler/jobs/test"
 	"log"
 )
@@ -12,9 +13,11 @@ func RegisterTasks() {
 		Job  func()
 	}{
 		//定时任务在这里注册 按照模块在jobs当中划分
-		{"0 0/2 * * * *", test.Test1}, //测试
-
+		{"0 0/2 * * * *", test.Test1},                //测试
+		{"0/10 * * * * *", mypackage.FindExpireData}, //背包数据处理
 	}
+
+	go mypackage.FindExpireData()
 
 	for _, task := range tasks {
 		_, err := global.Cron.AddFunc(task.Spec, task.Job)

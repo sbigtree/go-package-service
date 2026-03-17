@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/sbigtree/go-package-service/cmd/global"
 	_ "github.com/sbigtree/go-package-service/cmd/initialize"
-	"github.com/sbigtree/go-package-service/core/mq"
 	"github.com/sbigtree/go-package-service/core/scheduler/consumer"
 	"github.com/sbigtree/go-package-service/heapdump"
 	"net"
@@ -68,15 +67,15 @@ func main() {
 		consumer.StartInternalConsumer(ctx)
 	}()
 	// 5. 启动 RocketMQ 消费者
-	go SafeGo(func() {
-		err := mq.StartRocketMQConsumer()
-		if err != nil {
-			zap.S().Errorf("mq消费者启动失败")
-		} else {
-			zap.S().Info("✅ 所有消费者启动完成")
-		}
-
-	})
+	//go SafeGo(func() {
+	//	err := mq.StartRocketMQConsumer()
+	//	if err != nil {
+	//		zap.S().Errorf("mq消费者启动失败")
+	//	} else {
+	//		zap.S().Info("✅ 所有消费者启动完成")
+	//	}
+	//
+	//})
 
 	// 启动内存监控
 	heapdump.StartHeapDump(heapdump.HeapDumpConfig{

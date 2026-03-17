@@ -1,4 +1,4 @@
-package consumer_test
+package test
 
 import (
 	"fmt"

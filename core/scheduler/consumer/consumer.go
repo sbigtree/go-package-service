@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sbigtree/go-package-service/cmd/global"
 	"github.com/sbigtree/go-package-service/core/event"
+	"github.com/sbigtree/go-package-service/core/scheduler/consumer/mypackage"
 	consumer_test "github.com/sbigtree/go-package-service/core/scheduler/consumer/test"
 	"runtime/debug"
 	"sync"
@@ -18,7 +19,8 @@ import (
 
 // 定义每个任务的最大并发数 测试阶段设为1000
 var (
-	TestSem = NewConcurrencySem(50, "TestSem")
+	TestSem             = NewConcurrencySem(50, "TestSem")
+	CalculatePackageSem = NewConcurrencySem(1, "CalculatePackageSem")
 )
 var activeCounts = sync.Map{}
 
@@ -33,7 +35,12 @@ func StartInternalConsumer(ctx context.Context) {
 
 		}
 	})
-
+	consume[event.EventMsg](ctx, global.ExpireDataChannel, "CalculatePackageSem", CalculatePackageSem, func(msg event.EventMsg) {
+		err := mypackage.DealExpireData(msg)
+		if err != nil {
+			zap.S().Errorf("ExpireDataChannel", err)
+		}
+	})
 }
 
 func consume[T any](

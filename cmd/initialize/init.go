@@ -18,7 +18,7 @@ func init() {
 	//初始化elasticsearch连接
 	event.InitElasticsearchClient()
 	//初始化rocketmq
-	event.InitRocketmq()
+	//event.InitRocketmq()
 	event.InitSnowflake(1)
 	//初始化总路由
 	event.InitRouter()
