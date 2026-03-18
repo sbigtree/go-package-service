@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/sbigtree/go-package-service/cmd/global"
 	"github.com/sbigtree/go-package-service/core/tools"
+	"log"
 	"os"
 	"strings"
 
@@ -84,6 +85,7 @@ func InitAppConfig() {
 		zap.S().Error("解析 Nacos 配置失败: ", err)
 		panic(err)
 	}
+	log.Printf("configs %+v", configs)
 	key, err := base64.StdEncoding.DecodeString(global.CMDConfig.Nacos.Key)
 	if err != nil {
 		zap.S().Error("解析 Nacos Key 失败: ", err)
@@ -113,6 +115,7 @@ func InitAppConfig() {
 		zap.S().Error("反序列化 AppConfigMaster 失败: ", err)
 		panic(err)
 	}
+	log.Printf("AppConfigMaster %+v", global.AppConfigMaster)
 	// 使用默认值
 	if global.AppConfigMaster.GO_STEAM_TOOLS_HOST == "" {
 		global.AppConfigMaster.GO_STEAM_TOOLS_HOST = os.Getenv("GO_STEAM_TOOLS_HOST")

@@ -19,8 +19,9 @@ import (
 
 // 定义每个任务的最大并发数 测试阶段设为1000
 var (
-	TestSem             = NewConcurrencySem(50, "TestSem")
-	CalculatePackageSem = NewConcurrencySem(1, "CalculatePackageSem")
+	TestSem                 = NewConcurrencySem(50, "TestSem")
+	CalculatePackageSem     = NewConcurrencySem(1, "CalculatePackageSem")
+	CheckSendOfferStatusSem = NewConcurrencySem(1, "CheckSendOfferStatusSem")
 )
 var activeCounts = sync.Map{}
 
@@ -39,6 +40,12 @@ func StartInternalConsumer(ctx context.Context) {
 		err := mypackage.DealExpireData(msg)
 		if err != nil {
 			zap.S().Errorf("ExpireDataChannel", err)
+		}
+	})
+	consume[event.EventMsg](ctx, global.CheckSendOfferChannel, "CheckSendOfferStatusSem", CheckSendOfferStatusSem, func(msg event.EventMsg) {
+		err := mypackage.DealExpireData(msg)
+		if err != nil {
+			zap.S().Errorf("CheckSendOfferChannel", err)
 		}
 	})
 }

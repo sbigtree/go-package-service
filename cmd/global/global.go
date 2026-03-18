@@ -2,6 +2,8 @@ package global
 
 import (
 	"github.com/sbigtree/go-package-service/cmd/appconf"
+	"github.com/sbigtree/go-package-service/cmd/appconf/steam_tools"
+	steam_client_grpc "github.com/sbigtree/go-protobufs/generator/steam-client-server"
 	"os"
 	"sync"
 
@@ -32,6 +34,8 @@ var (
 	ZapLog           *zap.Logger
 	MongoDB          *mongo.Database
 	Cron             *cron.Cron
+	SteamTools       *steam_tools.SteamTools
+	SteamClient      steam_client_grpc.SteamClientGrpcClient
 )
 
 // 默认是 mq-goods-server  在 docker中配置环境变量  开发环境通过环境变量配置自定义自己的组，以免和测试环境抢资源

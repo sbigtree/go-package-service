@@ -11,7 +11,9 @@ require (
 	github.com/nacos-group/nacos-sdk-go/v2 v2.2.9
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260315093857-2f06be1bf7f0
+	github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260318100548-09075f1e17c7
+	github.com/sbigtree/go-protobufs v0.0.0-20260311025940-bbf760d85cdd
+	github.com/sbigtree/steam-tools-grpc v0.0.0-20260204040026-abc7eda39c94
 	github.com/spf13/viper v1.20.0
 	go.mongodb.org/mongo-driver v1.17.4
 	go.uber.org/zap v1.27.0
@@ -77,6 +79,7 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
+	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.6.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect

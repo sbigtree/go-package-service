@@ -348,8 +348,14 @@ github.com/rogpeppe/go-internal v1.13.1 h1:KvO1DLK/DRN07sQ1LQKScxyZJuNnedQ5/wKSR
 github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWNMNyH2VO9fmH0o=
 github.com/sagikazarmark/locafero v0.7.0 h1:5MqpDsTGNDhY8sGp0Aowyf0qKsPrhewaLSsFaodPcyo=
 github.com/sagikazarmark/locafero v0.7.0/go.mod h1:2za3Cg5rMaTMoG/2Ulr9AwtFaIppKXTRYnozin4aB5k=
-github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260315093857-2f06be1bf7f0 h1:sbRNzyVAQfbEPjdtzIcCEFIhWb+2U46hd4GY8QYrYvk=
-github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260315093857-2f06be1bf7f0/go.mod h1:P+OrMcloB+2SFXRx+DVMxddYw5tx+nSQDrIT1TQU0o4=
+github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260318100548-09075f1e17c7 h1:ESBjzqqmrQEe8wMy3AMalWu/qN/eAG/IdG40iuy8s48=
+github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260318100548-09075f1e17c7/go.mod h1:P+OrMcloB+2SFXRx+DVMxddYw5tx+nSQDrIT1TQU0o4=
+github.com/sbigtree/go-protobufs v0.0.0-20260311025940-bbf760d85cdd h1:fSaI1W8ULjsNBA6A/KQ/fSjrOZpuxrW719kdYF8Mi5s=
+github.com/sbigtree/go-protobufs v0.0.0-20260311025940-bbf760d85cdd/go.mod h1:cQjQDvoDNuqmTiJCmGzUauCgeQbjQSdmwD6uciwmvFw=
+github.com/sbigtree/steam-tools-grpc v0.0.0-20260204040026-abc7eda39c94 h1:3LjT/q/yFh5zysxLldbcq0/arJzoINoQuFzizpn8tkg=
+github.com/sbigtree/steam-tools-grpc v0.0.0-20260204040026-abc7eda39c94/go.mod h1:OrfzBQwadfyL3eHMk2QIyoUq6bn/AjCZr+snoy4MJ98=
+github.com/shopspring/decimal v1.4.0 h1:bxl37RwXBklmTi0C79JfXCEBD1cqqHt0bbgBAGFp81k=
+github.com/shopspring/decimal v1.4.0/go.mod h1:gawqmDU56v4yIKSwfBSFip1HdCCXN8/+DMd9qYNcwME=
 github.com/sirupsen/logrus v1.2.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/sirupsen/logrus v1.4.0/go.mod h1:LxeOpSwHxABJmUn/MG1IvRgCAasNZTLOkJPxbbu5VWo=
 github.com/sirupsen/logrus v1.4.2/go.mod h1:tLMulIdttU9McNUspp0xgXVQah82FyeX6MwdIuYE2rE=

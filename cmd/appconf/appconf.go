@@ -83,4 +83,5 @@ type AppConfigMaster struct {
 	GO_STEAM_TOOLS_HOST        string `json:"GO_STEAM_TOOLS_HOST"`
 	STATIC_SERVER              string `json:"STATIC_SERVER"`
 	GO_CS2TRADE_SERVER_HOST    string `json:"GO_CS2TRADE_SERVER_HOST"`
+	GO_STEAM_CLIENT_HOST       string `json:"GO_STEAM_CLIENT_HOST"`
 }

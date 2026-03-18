@@ -24,4 +24,6 @@ func init() {
 	event.InitRouter()
 	//初始化定时任务
 	event.InitScheduler()
+	//初始化steam_tools服务连接
+	event.InitSteamToolsClient()
 }
