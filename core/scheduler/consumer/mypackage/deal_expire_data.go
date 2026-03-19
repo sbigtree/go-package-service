@@ -37,6 +37,8 @@ type TradeTask struct {
 	AppID          string
 	UintAppID      uint32
 	Amount         string
+	PackID         string
+	CategoryName   string
 }
 
 func prepareTradeTask(ctx context.Context, id primitive.ObjectID, realTimeAssetIDMap map[string]bool) (*TradeTask, string, error) {
@@ -54,7 +56,7 @@ func prepareTradeTask(ctx context.Context, id primitive.ObjectID, realTimeAssetI
 		return nil, logID, err
 	}
 
-	var steamAid, assetId, appId, marketHashName string
+	var steamAid, assetId, appId, marketHashName, categoryName string
 	for _, o := range result.Origins {
 		switch o.Type {
 		case "steam_aid":
@@ -65,6 +67,8 @@ func prepareTradeTask(ctx context.Context, id primitive.ObjectID, realTimeAssetI
 			appId = fmt.Sprintf("%v", o.Value)
 		case "market_hash_name":
 			marketHashName = fmt.Sprintf("%v", o.Value)
+		case "from_type":
+			categoryName = fmt.Sprintf("%v", o.Value)
 		}
 	}
 
@@ -163,6 +167,8 @@ func prepareTradeTask(ctx context.Context, id primitive.ObjectID, realTimeAssetI
 		AppID:          appId,
 		UintAppID:      uint32(appIdInt),
 		Amount:         "1",
+		PackID:         id.Hex(),
+		CategoryName:   categoryName,
 	}
 	zap.S().Infof("[prepareTradeTask] 查询到数据 id=%v  耗时=%v", id.Hex(), time.Since(start))
 	return task, logID, nil
@@ -363,6 +369,8 @@ func DealExpireData(_event event.EventMsg) error {
 			SteamAID:         params.SteamAID,
 			ReceivedSteamAID: task.SteamAid,
 			ReceivedTradeURL: task.TradeUrl,
+			PackID:           task.PackID,
+			CategoryName:     task.CategoryName,
 		})
 	}
 

@@ -11,7 +11,7 @@ require (
 	github.com/nacos-group/nacos-sdk-go/v2 v2.2.9
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260318100548-09075f1e17c7
+	github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260319042217-a5674e018ac9
 	github.com/sbigtree/go-protobufs v0.0.0-20260311025940-bbf760d85cdd
 	github.com/sbigtree/steam-tools-grpc v0.0.0-20260204040026-abc7eda39c94
 	github.com/spf13/viper v1.20.0
