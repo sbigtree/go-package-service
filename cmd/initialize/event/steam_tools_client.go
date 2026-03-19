@@ -1,7 +1,6 @@
 package event
 
 import (
-	steam_client_grpc "github.com/sbigtree/go-protobufs/generator/steam-client-server"
 	steam_tools_grpc "github.com/sbigtree/steam-tools-grpc/go/generator"
 
 	"github.com/sbigtree/go-package-service/cmd/appconf/steam_tools"
@@ -28,11 +27,11 @@ func InitSteamToolsClient() {
 	}
 	// 2. 实例化gRPC客户端
 
-	conn2, err := grpc.Dial(global.AppConfigMaster.GO_STEAM_CLIENT_HOST, grpc.WithInsecure())
-	if err != nil {
-		zap.S().Error("连接SteamClient服务异常： %s\n", err)
-	}
-
-	global.SteamClient = steam_client_grpc.NewSteamClientGrpcClient(conn2)
+	//conn2, err := grpc.Dial(global.AppConfigMaster.GO_STEAM_CLIENT_HOST, grpc.WithInsecure())
+	//if err != nil {
+	//	zap.S().Error("连接SteamClient服务异常： %s\n", err)
+	//}
+	//
+	//global.SteamClient = steam_client_grpc.NewSteamClientGrpcClient(conn2)
 	zap.S().Info("✅ init steam_tools success")
 }

@@ -14,7 +14,7 @@ func RegisterTasks() {
 	}{
 		//定时任务在这里注册 按照模块在jobs当中划分
 		{"0 0/2 * * * *", test.Test1},                      //测试
-		{"0/10 * * * * *", mypackage.FindExpireData},       //背包数据处理
+		{"0 0/10 * * * *", mypackage.FindExpireData},       //背包数据处理
 		{"0 0/5 * * * *", mypackage.FindPackTradeTransfer}, //背包数据处理
 	}
 	//查找mongo表中数据

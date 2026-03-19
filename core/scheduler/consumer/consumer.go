@@ -43,7 +43,7 @@ func StartInternalConsumer(ctx context.Context) {
 		}
 	})
 	consume[event.EventMsg](ctx, global.CheckSendOfferChannel, "CheckSendOfferStatusSem", CheckSendOfferStatusSem, func(msg event.EventMsg) {
-		err := mypackage.DealExpireData(msg)
+		err := mypackage.CheckSendOfferStatus(msg)
 		if err != nil {
 			zap.S().Errorf("CheckSendOfferChannel", err)
 		}

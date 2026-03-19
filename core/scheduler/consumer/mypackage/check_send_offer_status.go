@@ -2,21 +2,24 @@ package mypackage
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/sbigtree/go-db-model/v2/models"
 	"github.com/sbigtree/go-package-service/cmd/global"
 	"github.com/sbigtree/go-package-service/core/event"
-	jobs "github.com/sbigtree/go-package-service/core/scheduler/jobs/mypackage"
+	"github.com/sbigtree/go-package-service/core/scheduler/util/upackage"
 	"go.uber.org/zap"
 )
 
 func CheckSendOfferStatus(_event event.EventMsg) error {
-	var params DealExpireDataParam
+	var params upackage.DealExpireDataParam
 	err := json.Unmarshal(_event.Params, &params)
 	if err != nil {
 		zap.S().Error("事件 FinalDispose 解析消息参数失败", zap.Error(err))
 		return err
 	}
 
+	logId := fmt.Sprintf(" CheckSendOfferStatus SteamAID=%v ", params.SteamAID)
+	zap.S().Infof("%s", logId)
 	if len(params.Ids) == 0 {
 		return nil
 	}
@@ -37,12 +40,12 @@ func CheckSendOfferStatus(_event event.EventMsg) error {
 	}
 
 	uniqueOffers := make(map[string]int32)
-	var results []jobs.OfferGroup
+	var results []upackage.OfferGroup
 	for _, item := range items {
 		if item.OfferID != "" {
 			if _, exists := uniqueOffers[item.OfferID]; !exists {
 				uniqueOffers[item.OfferID] = item.SteamAID
-				results = append(results, jobs.OfferGroup{
+				results = append(results, upackage.OfferGroup{
 					OfferID:          item.OfferID,
 					ReceivedSteamAid: item.ReceivedSteamAID,
 					PackID:           item.PackID,
@@ -54,30 +57,30 @@ func CheckSendOfferStatus(_event event.EventMsg) error {
 	}
 
 	for _, result := range results {
-		zap.S().Infof("处理交易:OfferID=%s，接收者Aid=%d", result.OfferID, result.ReceivedSteamAid)
-		checkResult := jobs.CheckOfferTradeStatus(result)
+		zap.S().Infof("%s 处理交易:OfferID=%s，接收者Aid=%d", logId, result.OfferID, result.ReceivedSteamAid)
+		checkResult := upackage.CheckOfferTradeStatus(result)
 		if checkResult {
 			//修改表中数据
-			updateResult := jobs.UpdateTradeTransferLogs(result.OfferID)
+			updateResult := upackage.UpdateTradeTransferLogs(result.OfferID)
 			if !updateResult {
-				updateResult = jobs.UpdateTradeTransferLogs(result.OfferID)
+				updateResult = upackage.UpdateTradeTransferLogs(result.OfferID)
 				if !updateResult {
 					continue
 				}
 			}
 			//修改mongo表中数据
-			jobs.UpdateMongoLineDataById(result.PackID)
+			upackage.UpdateMongoLineDataById(result.PackID)
 			//修改表中数据
 			switch result.CategoryName {
 			case "cs2_case_key":
 				//自开箱yym_un_case_record
-				jobs.UpdateCs2CaseKey(result.PackID, result.AssetID)
+				upackage.UpdateCs2CaseKey(result.PackID, result.AssetID)
 			case "cs2_xp_shop_account":
 				//武库yym_xp_shop_exchange_record
-				jobs.UpdateCs2XpShopAccount(result.PackID, result.AssetID)
+				upackage.UpdateCs2XpShopAccount(result.PackID, result.AssetID)
 			case "cs2_tradeup":
 				//汰换yym_cs2_tradeup_un_record
-				jobs.UpdateCs2Tradeup(result.PackID, result.AssetID)
+				upackage.UpdateCs2Tradeup(result.PackID, result.AssetID)
 			}
 		}
 	}

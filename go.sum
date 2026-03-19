@@ -350,6 +350,8 @@ github.com/sagikazarmark/locafero v0.7.0 h1:5MqpDsTGNDhY8sGp0Aowyf0qKsPrhewaLSsF
 github.com/sagikazarmark/locafero v0.7.0/go.mod h1:2za3Cg5rMaTMoG/2Ulr9AwtFaIppKXTRYnozin4aB5k=
 github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260319042217-a5674e018ac9 h1:ecPNje8u6nEVLhKZqEp405aHE+0e/yIR2LyJ12BJ7Ew=
 github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260319042217-a5674e018ac9/go.mod h1:P+OrMcloB+2SFXRx+DVMxddYw5tx+nSQDrIT1TQU0o4=
+github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260319070133-21cd475eb1bb h1:LjDljCJL0wrDMZ7Vn86yIxnrF841a+cfz2Pox13tb2I=
+github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260319070133-21cd475eb1bb/go.mod h1:P+OrMcloB+2SFXRx+DVMxddYw5tx+nSQDrIT1TQU0o4=
 github.com/sbigtree/go-protobufs v0.0.0-20260311025940-bbf760d85cdd h1:fSaI1W8ULjsNBA6A/KQ/fSjrOZpuxrW719kdYF8Mi5s=
 github.com/sbigtree/go-protobufs v0.0.0-20260311025940-bbf760d85cdd/go.mod h1:cQjQDvoDNuqmTiJCmGzUauCgeQbjQSdmwD6uciwmvFw=
 github.com/sbigtree/steam-tools-grpc v0.0.0-20260204040026-abc7eda39c94 h1:3LjT/q/yFh5zysxLldbcq0/arJzoINoQuFzizpn8tkg=

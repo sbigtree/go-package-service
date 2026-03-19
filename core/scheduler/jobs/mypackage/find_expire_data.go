@@ -5,7 +5,8 @@ import (
 	"fmt"
 	mongo2 "github.com/sbigtree/go-db-model/v2/mongo/models"
 	"github.com/sbigtree/go-package-service/core/event"
-	"github.com/sbigtree/go-package-service/core/scheduler/consumer/mypackage"
+	"github.com/sbigtree/go-package-service/core/scheduler/util/upackage"
+	"strconv"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -21,7 +22,7 @@ func FindExpireData() {
 	ctx := context.Background()
 	collection := global.MongoDB.Collection(global.InventoryPackTable)
 
-	pageSize := int64(1000) // 每次查询1000条
+	pageSize := int64(10) // 每次查询1000条
 	now := time.Now().Unix()
 
 	filter := bson.M{
@@ -58,19 +59,17 @@ func FindExpireData() {
 		var steamAID int32
 		for _, origin := range result.Origins {
 			if origin.Type == "steam_aid" {
-				var aid int
-				_, err := fmt.Sscan(origin.Value, "%d", &aid)
-				if err == nil {
-					steamAID = int32(aid)
-				} else {
-					zap.S().Warn("steam_aid 转换失败", origin.Value)
+				steamAIdInt, err := strconv.Atoi(origin.Value)
+				if err != nil {
+					zap.S().Warnf("steam_aid 转换失败%v %v %T", origin.Value, err, origin.Value)
 				}
+				steamAID = int32(steamAIdInt)
 				break
 			}
 		}
 
 		if steamAID == 0 {
-			zap.S().Warn("未找到steam_aid", "id", result.ID.Hex())
+			zap.S().Warnf("未找到steam_aid id=%s %v", result.ID.Hex(), result.Origins)
 			continue
 		}
 
@@ -78,17 +77,23 @@ func FindExpireData() {
 		count++
 	}
 
+	zap.S().Infof(" current grouped count=%d", len(grouped))
 	for steamAID, ids := range grouped {
 		if len(ids) == 0 {
 			continue
 		}
-		param := mypackage.DealExpireDataParam{
+		param := upackage.DealExpireDataParam{
 			Ids: ids,
 		}
+		zap.S().Infof(" current grouped ids_count=%d", len(param.Ids))
 		msg := event.NewEventMsg(map[string]interface{}{
 			"ids":       param.Ids,
 			"steam_aid": steamAID,
 		})
+		//zap.S().Infof("write expire data channel %v", map[string]interface{}{
+		//	"ids":       param.Ids,
+		//	"steam_aid": steamAID,
+		//})
 		global.ExpireDataChannel <- msg
 	}
 
