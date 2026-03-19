@@ -24,6 +24,7 @@ import (
 type DealExpireDataParam struct {
 	Ids      []primitive.ObjectID `json:"ids"` // mongodb表主键id
 	SteamAID int32                `json:"steam_aid"`
+	OfferID  string               `json:"offer_id"`
 }
 
 type TradeTask struct {
@@ -324,6 +325,7 @@ func DealExpireData(_event event.EventMsg) error {
 			return nil
 		}
 	}
+
 	response, err := global.SteamTools.OfferServerClient.SendOffer(context.Background(), &steam_tools_grpc.OfferSendOfferRequest{
 		SteamAid:    tasks[0].SteamAid,
 		TradeUrl:    tasks[0].TradeUrl,
@@ -387,7 +389,8 @@ func DealExpireData(_event event.EventMsg) error {
 		//写通道数据
 		msg := event.NewEventMsg(map[string]interface{}{
 			"ids":       objectIds,
-			"steam_aid": params.SteamAID,
+			"steam_aid": tasks[0].SteamAid,
+			"offer_id":  *response.Data.Tradeofferid, //交易id
 		})
 		global.CheckSendOfferChannel <- msg
 	}

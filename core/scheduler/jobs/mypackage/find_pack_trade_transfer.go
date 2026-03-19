@@ -70,21 +70,20 @@ func FindPackTradeTransfer() {
 					if !updateResult {
 						continue
 					}
-
-					//修改mongo表中数据
-					UpdateMongoLineDataById(result.PackID)
-					//修改表中数据
-					switch result.CategoryName {
-					case "cs2_case_key":
-						//自开箱yym_un_case_record
-						UpdateCs2CaseKey(result.PackID, result.AssetID)
-					case "cs2_xp_shop_account":
-						//武库yym_xp_shop_exchange_record
-						UpdateCs2XpShopAccount(result.PackID, result.AssetID)
-					case "cs2_tradeup":
-						//汰换yym_cs2_tradeup_un_record
-						UpdateCs2Tradeup(result.PackID, result.AssetID)
-					}
+				}
+				//修改mongo表中数据
+				UpdateMongoLineDataById(result.PackID)
+				//修改表中数据
+				switch result.CategoryName {
+				case "cs2_case_key":
+					//自开箱yym_un_case_record
+					UpdateCs2CaseKey(result.PackID, result.AssetID)
+				case "cs2_xp_shop_account":
+					//武库yym_xp_shop_exchange_record
+					UpdateCs2XpShopAccount(result.PackID, result.AssetID)
+				case "cs2_tradeup":
+					//汰换yym_cs2_tradeup_un_record
+					UpdateCs2Tradeup(result.PackID, result.AssetID)
 				}
 			}
 		}
@@ -136,19 +135,19 @@ func UpdateMongoLineDataById(id string) bool {
 
 	objID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
-		zap.S().Errorf("无效的ID格式:%v", err)
+		zap.S().Errorf("无效的ID格式:%v %v", err, id)
 		return false
 	}
 	filter := bson.M{"_id": objID}
 	update := bson.M{
 		"$set": bson.M{
-			"id_del":      1,
+			"is_del":      1,
 			"update_time": time.Now().UnixMilli(),
 		},
 	}
 
 	result, err := collection.UpdateOne(ctx, filter, update)
-	if err != err {
+	if err != nil {
 		zap.S().Errorf("更新失败: %v %v", err, id)
 		return false
 	}
