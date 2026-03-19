@@ -16,7 +16,6 @@ import (
 	steam_tools_tools "github.com/sbigtree/steam-tools-grpc/go/tools"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 	"strconv"
 	"time"
@@ -42,140 +41,150 @@ type PartSteamAccount struct {
 	TradeURL string
 }
 
-func prepareTradeTask(ctx context.Context, id primitive.ObjectID, realTimeAssetIDMap map[string]bool, logId string) (*TradeTask, error) {
-
-	logID := fmt.Sprintf("%s DealExpireData id:%s", logId, id.Hex())
-	start := time.Now()
-	collection := global.MongoDB.Collection("my_inventory_pack")
-	filter := bson.M{"_id": id}
-	var result mongo2.MyInventoryPack
-	if err := collection.FindOne(ctx, filter).Decode(&result); err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			zap.S().Warnf("%s Mongo 中不存在该数据，跳过 id=%v", logID, id.Hex())
-			return nil, err
-		}
-		return nil, err
-	}
-
-	var steamAid, assetId, appId, marketHashName, categoryName string
-	for _, o := range result.Origins {
-		switch o.Type {
-		case "steam_aid":
-			steamAid = fmt.Sprintf("%v", o.Value)
-		case "asset_id":
-			assetId = fmt.Sprintf("%v", o.Value)
-		case "appid":
-			appId = fmt.Sprintf("%v", o.Value)
-		case "market_hash_name":
-			marketHashName = fmt.Sprintf("%v", o.Value)
-		case "from_type":
-			categoryName = fmt.Sprintf("%v", o.Value)
-		}
-	}
-
-	if _, ok := realTimeAssetIDMap[assetId]; !ok {
-		zap.S().Warnf("%s 物品:%s不在steam实时库存当中，请检查后再操作", logID, result.Name)
-		return nil, errors.New("assetId not exist")
-	}
-
-	appIdInt, err := strconv.Atoi(appId)
-	if err != nil {
-		zap.S().Warnf("%s appId 转换失败 err %v", logID, err)
-		return nil, err
-	}
-
-	tempSteamAid, err := strconv.Atoi(steamAid)
-	if err != nil {
-		zap.S().Warnf("%s steamId 转换失败 err %+v ", logID, steamAid)
-		return nil, err
-	}
-
-	//第4步查询表中数据 判断账号信息是否正常
+func checkGameSellerStatus(logId string, tempSteamAid int) bool {
+	// 查询 SteamAccount
 	var steam models.SteamAccount
-	err = global.DB.Where("id = ?", tempSteamAid).Take(&steam).Error
+	err := global.DB.Where("id = ?", tempSteamAid).Take(&steam).Error
 	if err != nil {
-		zap.S().Warnf("%s === 库存风控 %s 查询steam失败 ", logID, steamAid)
-		return nil, err
+		zap.S().Warnf("%s 查询 SteamAccount 失败 steamAid=%v err=%v", logId, tempSteamAid, err)
+		return false
 	}
 
-	// 检查状态是否可用
-	if steam.CommunityBanned != nil && *steam.CommunityBanned == 1 {
-		zap.S().Errorf("%s 账号社区封禁，无法发起报价", logID)
-		return nil, errors.New("账号社区封禁，无法发起报价")
+	// 检查状态
+	if (steam.CommunityBanned != nil && *steam.CommunityBanned == 1) ||
+		(steam.VacBanned != nil && *steam.VacBanned == 1) ||
+		(steam.LoginEresult != nil && *steam.LoginEresult == 5) ||
+		steam.Guard == "" {
+		zap.S().Warnf("%s SteamAccount 状态不可用 steamAid=%v", logId, tempSteamAid)
+		return false
 	}
 
-	if steam.LoginEresult != nil && *steam.LoginEresult == 5 {
-		zap.S().Errorf("%s 卖家密码错误，添加用户黑名单失败", logID)
-		return nil, errors.New("卖家密码错误，添加用户黑名单失败")
-	}
-
-	//如果 VAC 封禁了 直接修改可用状态为不可用
-	if steam.VacBanned != nil && *steam.VacBanned == 1 {
-		zap.S().Errorf("%s 账号VAC封禁，无法发起报价", logID)
-		return nil, errors.New("账号VAC封禁，无法发起报价")
-	}
-
-	if steam.Guard == "" {
-		zap.S().Warnf("%s 卖家账号令牌不存在，无法发起报价", logID)
-		return nil, errors.New("卖家账号令牌不存在，无法发起报价")
-	}
-
+	// 解密 Guard
 	jsonData, err := tools.DecryptAES(steam.Guard, []byte(global.AppConfigMaster.AESCRYPTKEY), "hex")
 	if err != nil {
-		zap.S().Warnf("%s 解析guard得到一个json结构体失败", logID)
-		return nil, err
+		zap.S().Warnf("%s 解密 Guard 失败 steamAid=%v", logId, tempSteamAid)
+		return false
 	}
-
 	var steamAuthData steam_tools.SteamAuthInfo
-	err = json.Unmarshal([]byte(jsonData), &steamAuthData)
-	if err != nil {
-		zap.S().Warnf("%s %+v 序列化失败的令牌内容", logID, jsonData)
-		zap.S().Errorf("解析 SteamAuthInfo 失败 err %+v %s", err, logID)
-		return nil, errors.New("解析 SteamAuthInfo 失败")
+	if err := json.Unmarshal([]byte(jsonData), &steamAuthData); err != nil || steamAuthData.IdentitySecret == "" {
+		zap.S().Warnf("%s SteamAuthInfo 解析失败 steamAid=%v", logId, tempSteamAid)
+		return false
 	}
-
-	if steamAuthData.IdentitySecret == "" {
-		zap.S().Warnf("%s 卖家账号令牌内容不完整，无法发起报价", logID)
-		return nil, errors.New("identity secret empty")
-	}
-
-	for _, tag := range result.Tags {
-		if tag.Type == "tradable_time" {
-			tradeableTimeInt, err := strconv.ParseInt(tag.Value, 10, 64)
-			if err != nil {
-				zap.S().Errorf("%s 解析可交易时间失败 %v", logID, zap.Error(err))
-				return nil, errors.New("item not tradable yet")
-			}
-			currentTime := time.Now().Unix()
-			if currentTime < tradeableTimeInt {
-				zap.S().Warnf("%s 物品: %s 存在冷却中的物品，请检查后再操作 %s", result.Name, logID, time.Unix(tradeableTimeInt, 0).Format("2006-01-02 15:04:05"))
-				return nil, errors.New("存在冷却中的物品，请检查后再操作")
-			}
-		}
-	}
-
-	task := &TradeTask{
-		UserID:         result.UserId,
-		AssetID:        assetId,
-		MarketName:     result.Name,
-		MarketHashName: marketHashName,
-		Img:            result.ImageUrl,
-		AppID:          appId,
-		UintAppID:      uint32(appIdInt),
-		Amount:         "1",
-		PackID:         id.Hex(),
-		CategoryName:   categoryName,
-	}
-	zap.S().Infof("%s [prepareTradeTask] 查询到数据 id=%v  耗时=%v", logID, id.Hex(), time.Since(start))
-	return task, nil
+	return true
 }
 
+func prepareTradeTasksBatch(
+	ids []primitive.ObjectID,
+	realTimeAssetIDMap map[string]bool,
+	logId string,
+) ([]*TradeTask, []primitive.ObjectID, error) {
+
+	start := time.Now()
+	collection := global.MongoDB.Collection("my_inventory_pack")
+
+	// 1️⃣ 批量查询 MongoDB
+	filter := bson.M{"_id": bson.M{"$in": ids}}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		zap.S().Errorf("%s Mongo 批量查询失败 err=%v", logId, err)
+		return nil, nil, err
+	}
+
+	var results []mongo2.MyInventoryPack
+	if err := cursor.All(ctx, &results); err != nil {
+		zap.S().Errorf("%s Mongo 批量查询解析失败 err=%v", logId, err)
+		return nil, nil, err
+	}
+	zap.S().Infof("%s Mongo 批量查询完成, 查询到 %d 条数据, 耗时=%v", logId, len(results), time.Since(start))
+
+	// 2️⃣ 建立结果 map
+	packMap := make(map[primitive.ObjectID]mongo2.MyInventoryPack, len(results))
+	for _, p := range results {
+		packMap[p.ID] = p
+	}
+
+	// 3️⃣ 遍历 ids 构建 TradeTask
+	tradeTaskMap := make([]*TradeTask, 0, len(ids))
+	objectIds := make([]primitive.ObjectID, 0, len(ids))
+	now := time.Now().Unix()
+	for _, id := range ids {
+		result, ok := packMap[id]
+		if !ok {
+			zap.S().Warnf("%s Mongo 中不存在该数据，跳过 id=%v", logId, id.Hex())
+			continue
+		}
+
+		var assetId, appId, marketHashName, categoryName string
+		for _, o := range result.Origins {
+			switch o.Type {
+			//case "steam_aid":
+			//	steamAid = fmt.Sprintf("%v", o.Value)
+			case "asset_id":
+				assetId = o.Value
+			case "appid":
+				appId = o.Value
+			case "market_hash_name":
+				marketHashName = o.Value
+			case "from_type":
+				categoryName = o.Value
+			}
+		}
+
+		if _, ok := realTimeAssetIDMap[assetId]; !ok {
+			zap.S().Warnf("%s 物品:%s不在steam实时库存中，跳过", logId, result.Name)
+			continue
+		}
+
+		appIdInt, err := strconv.Atoi(appId)
+		if err != nil {
+			zap.S().Warnf("%s appId 转换失败 err %v", logId, err)
+			continue
+		}
+
+		// 检查 tradable_time 标签
+		skip := false
+		for _, tag := range result.Tags {
+			if tag.Type == "tradable_time" {
+				tradeableTimeInt, err := strconv.ParseInt(tag.Value, 10, 64)
+				if err != nil || now < tradeableTimeInt {
+					skip = true
+					break
+				}
+			}
+		}
+		if skip {
+			continue
+		}
+
+		task := &TradeTask{
+			UserID:         result.UserId,
+			AssetID:        assetId,
+			MarketName:     result.Name,
+			MarketHashName: marketHashName,
+			Img:            result.ImageUrl,
+			AppID:          appId,
+			UintAppID:      uint32(appIdInt),
+			Amount:         "1",
+			PackID:         id.Hex(),
+			CategoryName:   categoryName,
+		}
+		objectIds = append(objectIds, id)
+		tradeTaskMap = append(tradeTaskMap, task)
+		zap.S().Infof("%s prepareTradeTask 构建完成 id=%v", logId, id.Hex())
+	}
+
+	return tradeTaskMap, objectIds, nil
+}
 func getRealTimeInventory(tempSteamAid int32, logId string) (map[string]bool, error) {
-	resp, err := global.SteamTools.InventoryCsgoServerClient.GetInventoryCsgo(context.Background(), &steam_tools_grpc.InventoryCsgoRequest{
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	resp, err := global.SteamTools.InventoryCsgoServerClient.GetInventoryCsgo(ctx, &steam_tools_grpc.InventoryCsgoRequest{
 		SteamAid: tempSteamAid,
 	})
 	if err != nil {
-		zap.S().Errorf("%s %d 调用 SteamTools 获取库存失败  %v", logId, tempSteamAid, zap.Error(err))
+		zap.S().Errorf("%s %d 调用 SteamTools 获取库存失败  %v", logId, tempSteamAid, err)
 		return nil, err
 	}
 	if !resp.Success {
@@ -198,11 +207,13 @@ func reGetTradeUrl(tradeUrl string, steamaid int32) (string, error) {
 	zap.S().Warnf("该steam账号未设置交易链接 %v", tradeUrl)
 	//调用steam_tools服务获取交易链接
 	// 同步账号信息 先同步账号信息再查询数据库
-	SteamProfileInfo, err := global.SteamTools.AccountServerClient.GetProfile(context.Background(), &steam_tools_grpc.AccountGetProfileRequest{
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	SteamProfileInfo, err := global.SteamTools.AccountServerClient.GetProfile(ctx, &steam_tools_grpc.AccountGetProfileRequest{
 		SteamAid: steamaid,
 	})
 	if err != nil {
-		zap.S().Errorf("发送报价调用steam_tools服务获取交易链接失败 %v", zap.Error(err))
+		zap.S().Errorf("发送报价调用steam_tools服务获取交易链接失败 %v", err)
 		return "", errors.New("发送报价调用steam_tools服务获取交易链接失败")
 	}
 	if !SteamProfileInfo.Success {
@@ -220,7 +231,7 @@ func reGetTradeUrl(tradeUrl string, steamaid int32) (string, error) {
 	return tradeUrl, nil
 }
 
-func getTradeCount(ctx context.Context, tempSteamAid int32, logId string) bool {
+func getTradeCount(tempSteamAid int32, logId string) bool {
 	//查看用户当下是否可以发起交易  一个用户最多发起5次交易
 	offerListReq := &steam_tools_grpc.OfferGetOfferListRequest{
 		SteamAid:   tempSteamAid,
@@ -228,6 +239,8 @@ func getTradeCount(ctx context.Context, tempSteamAid int32, logId string) bool {
 	}
 
 	// 注意：请确认你的 global.SteamTools 中是否有 OfferServerClient 实例
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
 	offerResp, err := global.SteamTools.OfferServerClient.GetOfferList(ctx, offerListReq)
 	if err != nil {
 		zap.S().Warnf("%s %d 调用Node gRPC服务[GetOfferList]失败! err %+v ", logId, tempSteamAid, err)
@@ -252,14 +265,21 @@ func DealExpireData(_event event.EventMsg) error {
 	var params upackage.DealExpireDataParam
 	err := json.Unmarshal(_event.Params, &params)
 	if err != nil {
-		zap.S().Error("事件 FinalDispose 解析消息参数失败", zap.Error(err))
+		zap.S().Error("事件 FinalDispose 解析消息参数失败", err)
 		return err
 	}
 
-	ctx := context.Background()
 	logId := fmt.Sprintf(" DealExpireData SteamAID=%v ", params.SteamAID)
+
+	//检查卖家用户状态
+	sellerStatus := checkGameSellerStatus(logId, int(params.SteamAID))
+	if !sellerStatus {
+		zap.S().Errorf(" checkGameSellerStatus the  SteamAID forbid %+v", params.SteamAID)
+		return nil
+	}
+
 	zap.S().Infof("%s", logId)
-	if !getTradeCount(ctx, params.SteamAID, logId) {
+	if !getTradeCount(params.SteamAID, logId) {
 		zap.S().Errorf(" getTradeCount data err %+v", params.SteamAID)
 		return nil
 	}
@@ -267,29 +287,33 @@ func DealExpireData(_event event.EventMsg) error {
 	//前置查询
 	realTimeAssetIDMap, err := getRealTimeInventory(params.SteamAID, logId)
 	if err != nil {
-		zap.S().Errorf("%+v getRealTimeInventory data err %+v", params.SteamAID, zap.Error(err))
+		zap.S().Errorf("%+v getRealTimeInventory data err %+v", params.SteamAID, err)
 		return err
 	}
 	zap.S().Infof("logID = %s will execute logid count=%v", logId, len(params.Ids))
-	tasks := make([]TradeTask, 0, len(params.Ids))
-	objectIds := make([]primitive.ObjectID, 0, len(params.Ids))
-	for i, id := range params.Ids {
-		t, err := prepareTradeTask(ctx, id, realTimeAssetIDMap, logId)
-		zap.S().Infof("logID = %s mongoId = %s err=%v t=%v i=%v", logId, id, err, t, i)
-		if err != nil {
-			zap.S().Warnf("prepareTradeTask 失败 id=%s err=%v t=%v", id.Hex(), err, t)
-			continue
-		}
-		if t != nil {
-			objectIds = append(objectIds, id)
-			tasks = append(tasks, *t)
+	tradeTaskMap, objectIds, err := prepareTradeTasksBatch(params.Ids, realTimeAssetIDMap, logId)
+	if err != nil {
+		zap.S().Errorf("%s prepareTradeTasksBatch error %+v", logId, err)
+		return err
+	}
+	// 转成切片和 objectIds
+	tasks := make([]TradeTask, 0, len(tradeTaskMap))
+
+	for _, task := range tradeTaskMap {
+		if task != nil {
+			tasks = append(tasks, *task)
 		}
 	}
-	zap.S().Infof("%s current task num %d", logId, len(tasks))
-	myItem := make([]*steam_tools_grpc.OfferSendOfferRequest_TradeItem, 0, len(tasks))
-	themItemsReq := []*steam_tools_grpc.OfferSendOfferRequest_TradeItem{}
 
-	var logs []models.InventoryPackTradeTransferLog
+	zap.S().Infof("%s current task num %d", logId, len(tasks))
+	if len(tasks) == 0 {
+		zap.S().Warnf("%s 没有可执行的任务 steamAid=%d", logId, params.SteamAID)
+		return nil
+	}
+	zap.S().Infof("%s current task num %d", logId, len(tasks))
+
+	myItem := make([]*steam_tools_grpc.OfferSendOfferRequest_TradeItem, 0, len(tasks))
+
 	for _, task := range tasks {
 		itemData := steam_tools_grpc.OfferSendOfferRequest_TradeItem{
 			Amount:  task.Amount,
@@ -303,10 +327,6 @@ func DealExpireData(_event event.EventMsg) error {
 	}
 
 	zap.S().Infof("%s 当前可执行的任务信息 steamAid=%d tasks=%d", logId, params.SteamAID, len(tasks))
-	if len(tasks) == 0 {
-		zap.S().Warnf("%s 没有可执行的任务 steamAid=%d", logId, params.SteamAID)
-		return nil
-	}
 
 	//查表user_groups中数据
 	var userGroups []models.UserGroup
@@ -316,9 +336,9 @@ func DealExpireData(_event event.EventMsg) error {
 	}
 	zap.S().Infof("%s 当前usergroup info steamAid=%d userGroups=%d", logId, params.SteamAID, len(userGroups))
 
-	var groupIds []int32
-	for _, item := range userGroups {
-		groupIds = append(groupIds, item.GroupID)
+	groupIds := make([]int32, 0, len(userGroups))
+	for _, g := range userGroups {
+		groupIds = append(groupIds, g.GroupID)
 	}
 
 	zap.S().Infof("%s 当前groupIds info steamAid=%d groupIds=%d", logId, params.SteamAID, len(groupIds))
@@ -371,12 +391,13 @@ func DealExpireData(_event event.EventMsg) error {
 			return nil
 		}
 	}
-
-	response, err := global.SteamTools.OfferServerClient.SendOffer(context.Background(), &steam_tools_grpc.OfferSendOfferRequest{
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	response, err := global.SteamTools.OfferServerClient.SendOffer(ctx, &steam_tools_grpc.OfferSendOfferRequest{
 		SteamAid:    int32(transferSteamId),
 		TradeUrl:    executeSteamAccount[0].TradeURL,
 		MyItems:     myItem,
-		ThemItems:   themItemsReq,
+		ThemItems:   []*steam_tools_grpc.OfferSendOfferRequest_TradeItem{},
 		AutoConfirm: 1,
 	})
 
@@ -389,29 +410,11 @@ func DealExpireData(_event event.EventMsg) error {
 		)
 		return err
 	}
-	if response == nil {
-		zap.S().Errorf("%s send offer response is nil 调用steam_tools服务失败 err=%+v response=%+v steamAid=%d", logId, err, response, transferSteamId)
-		return errors.New("send offer response is nil")
+	if response == nil || response.Data == nil || response.Data.Tradeofferid == nil || *response.Data.Tradeofferid == "" {
+		zap.S().Errorf("%s send offer response invalid steamAid=%d", logId, transferSteamId)
+		return errors.New("send offer response invalid")
 	}
-
-	if response.Data == nil {
-		zap.S().Errorf("%s send offer response data is nil 调用steam_tools服务失败 err=%+v response=%+v steamAid=%d", logId, err, response, transferSteamId)
-		// gRPC 成功但业务返回 Data 为空
-		return errors.New("send offer response data is nil")
-	}
-
-	if response.Data.Tradeofferid == nil || *response.Data.Tradeofferid == "" {
-		zap.S().Errorf("%s tradeofferid empty response=%s steamAid=%d ", logId, response, transferSteamId)
-		return errors.New("tradeofferid empty")
-	}
-
-	if !response.Success {
-		zap.S().Errorf("%s 调用steam_tools服务失败 err=%+v response=%+v steamAid=%d", logId, err, response, transferSteamId)
-		if response.Data.ErrorCode != nil && *response.Data.ErrorCode == 112 {
-			zap.S().Errorf("%s 发送报价失败，请稍后再试 err=%+v response=%+v steamAid=%d data=%v StrError=%v", logId, err, response, transferSteamId, response.Data, *response.Data.StrError)
-		}
-		return nil
-	}
+	var logs []models.InventoryPackTradeTransferLog
 	for _, task := range tasks {
 		logs = append(logs, models.InventoryPackTradeTransferLog{
 			UserID:           task.UserID,
@@ -446,11 +449,7 @@ func DealExpireData(_event event.EventMsg) error {
 			"steam_aid": int32(transferSteamId),
 			"offer_id":  *response.Data.Tradeofferid, //交易id
 		})
-		select {
-		case global.CheckSendOfferChannel <- msg:
-		default:
-			zap.S().Warnf("%s CheckSendOfferChannel 满，发送失败", logId)
-		}
+		global.CheckSendOfferChannel <- msg
 	}
 
 	return nil
