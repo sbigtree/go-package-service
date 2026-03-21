@@ -22,27 +22,6 @@ import (
 	"time"
 )
 
-type TradeTask struct {
-	SteamAid       int32
-	TradeUrl       string
-	UserID         int64
-	AssetID        string
-	MarketName     string
-	MarketHashName string
-	Img            string
-	AppID          string
-	UintAppID      uint32
-	Amount         string
-	PackID         string
-	CategoryName   string
-	ObjectID       primitive.ObjectID //mongo表my_inventory_pack中主键id
-}
-
-type PartSteamAccount struct {
-	Steamid  string
-	TradeURL string
-}
-
 func checkGameSellerStatus(logId string, tempSteamAid int) bool {
 	// 查询 SteamAccount
 	var steam models.SteamAccount
@@ -79,7 +58,7 @@ func prepareTradeTasksBatch(
 	ids []primitive.ObjectID,
 	realTimeAssetIDMap map[string]bool,
 	logId string,
-) ([]TradeTask, []string, error) {
+) ([]upackage.TradeTask, []string, error) {
 
 	start := time.Now()
 	collection := global.MongoDB.Collection("my_inventory_pack")
@@ -108,7 +87,7 @@ func prepareTradeTasksBatch(
 	}
 
 	// 3️⃣ 遍历 ids 构建 TradeTask
-	tradeTaskMap := make([]TradeTask, 0, len(ids))
+	tradeTaskMap := make([]upackage.TradeTask, 0, len(ids))
 	now := time.Now().Unix()
 	assets := make([]string, 0, len(ids))
 	for _, id := range ids {
@@ -160,7 +139,7 @@ func prepareTradeTasksBatch(
 			continue
 		}
 
-		task := TradeTask{
+		task := upackage.TradeTask{
 			UserID:         result.UserId,
 			AssetID:        assetId,
 			MarketName:     result.Name,

@@ -24,6 +24,27 @@ type DealExpireDataParam struct {
 	OfferID  string               `json:"offer_id"`
 }
 
+type SteamOfferKey struct {
+	SteamAID int32
+	OfferID  string
+}
+
+type TradeTask struct {
+	SteamAid       int32
+	TradeUrl       string
+	UserID         int64
+	AssetID        string
+	MarketName     string
+	MarketHashName string
+	Img            string
+	AppID          string
+	UintAppID      uint32
+	Amount         string
+	PackID         string
+	CategoryName   string
+	ObjectID       primitive.ObjectID //mongo表my_inventory_pack中主键id
+}
+
 // 资产数量
 const TotalAssetsNum = 1000
 
