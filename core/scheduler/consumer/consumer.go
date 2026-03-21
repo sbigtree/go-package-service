@@ -19,9 +19,10 @@ import (
 
 // 定义每个任务的最大并发数 测试阶段设为1000
 var (
-	TestSem                 = NewConcurrencySem(50, "TestSem")
-	CalculatePackageSem     = NewConcurrencySem(1, "CalculatePackageSem")
-	CheckSendOfferStatusSem = NewConcurrencySem(1, "CheckSendOfferStatusSem")
+	TestSem               = NewConcurrencySem(50, "TestSem")
+	ExpireDataChannel1Sem = NewConcurrencySem(1, "ExpireDataChannel1Sem")
+	ExpireDataChannel2Sem = NewConcurrencySem(1, "ExpireDataChannel2Sem")
+	ExpireDataChannel3Sem = NewConcurrencySem(1, "ExpireDataChannel3Sem")
 )
 var activeCounts = sync.Map{}
 
@@ -36,16 +37,22 @@ func StartInternalConsumer(ctx context.Context) {
 
 		}
 	})
-	consume[event.EventMsg](ctx, global.ExpireDataChannel, "CalculatePackageSem", CalculatePackageSem, func(msg event.EventMsg) {
-		err := mypackage.DealExpireData(msg)
+	consume[event.EventMsg](ctx, global.ExpireDataChannel1, "ExpireDataChannel1Sem", ExpireDataChannel1Sem, func(msg event.EventMsg) {
+		err := mypackage.DealExpireData1(msg)
 		if err != nil {
-			zap.S().Errorf("ExpireDataChannel", err)
+			zap.S().Errorf("ExpireDataChannel1", err)
 		}
 	})
-	consume[event.EventMsg](ctx, global.CheckSendOfferChannel, "CheckSendOfferStatusSem", CheckSendOfferStatusSem, func(msg event.EventMsg) {
-		err := mypackage.CheckSendOfferStatus(msg)
+	consume[event.EventMsg](ctx, global.ExpireDataChannel2, "ExpireDataChannel2Sem", ExpireDataChannel2Sem, func(msg event.EventMsg) {
+		err := mypackage.DealExpireData2(msg)
 		if err != nil {
-			zap.S().Errorf("CheckSendOfferChannel", err)
+			zap.S().Errorf("ExpireDataChannel2", err)
+		}
+	})
+	consume[event.EventMsg](ctx, global.ExpireDataChannel3, "ExpireDataChannel3Sem", ExpireDataChannel3Sem, func(msg event.EventMsg) {
+		err := mypackage.DealExpireData3(msg)
+		if err != nil {
+			zap.S().Errorf("ExpireDataChannel3", err)
 		}
 	})
 }

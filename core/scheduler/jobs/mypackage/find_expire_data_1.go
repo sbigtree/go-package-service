@@ -2,7 +2,6 @@ package mypackage
 
 import (
 	"context"
-	"fmt"
 	mongo2 "github.com/sbigtree/go-db-model/v2/mongo/models"
 	"github.com/sbigtree/go-package-service/core/event"
 	"github.com/sbigtree/go-package-service/core/scheduler/util/upackage"
@@ -17,24 +16,50 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// FindExpireData 每次生产任务只读取一页数据（1000条）
-func FindExpireData() {
+// FindExpireData1 每次生产任务只读取一页数据（1000条）
+func FindExpireData1() {
 	ctx := context.Background()
 	collection := global.MongoDB.Collection(global.InventoryPackTable)
 
-	pageSize := int64(10) // 每次查询1000条
+	pageSize := int64(1000) // 每次查询1000条
 	now := time.Now().Unix()
+	zap.S().Infof("now=%v", now)
+	ids := []string{
+		//"69bd37ab43f4e3d6928d3db4",
+		//"69bd37a04dce64630aaf6c60",
+		//"69bd3793a06c2e92d09a4640",
+		//"69bd357390ea3d32ebef8c12",
+		//"69bd359ee1bb5b117376c3ad",
+		//"69bd35b360d8427a32327942",
+		"69bd4ce8b6c8aab3a1c21cb5",
+		"69bd4cf925c61ccbbf7cd230",
+		"69bd4ae64e6c5d43715af8c0",
+		"69bd4af74f547501ee22a90b",
+	}
 
+	objectIDs := make([]primitive.ObjectID, 0, len(ids))
+
+	for _, id := range ids {
+		oid, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			zap.S().Warnf("非法ObjectID: %s err=%v", id, err)
+			continue
+		}
+		objectIDs = append(objectIDs, oid)
+	}
 	filter := bson.M{
-		"expire_time": bson.M{"$lt": now},
+		//"expire_time": bson.M{"$lt": now},
+		"_id": bson.M{
+			"$in": objectIDs,
+		},
 		"is_del":      0, // 0 表示正常状态
 		"take_usable": 1, //可提取状态
-		"Tags": bson.M{
-			"$elemMatch": bson.M{
-				"type":  "tradable_time",
-				"value": bson.M{"$lt": fmt.Sprintf("%d", now)}, // tradable_time 小于当前时间
-			},
-		},
+		//"Tags": bson.M{
+		//	"$elemMatch": bson.M{
+		//		"type":  "tradable_time",
+		//		"value": bson.M{"$lt": fmt.Sprintf("%d", now)}, // tradable_time 小于当前时间
+		//	},
+		//},
 	}
 
 	findOpts := options.Find()
@@ -90,11 +115,11 @@ func FindExpireData() {
 			"ids":       param.Ids,
 			"steam_aid": steamAID,
 		})
-		//zap.S().Infof("write expire data channel %v", map[string]interface{}{
-		//	"ids":       param.Ids,
-		//	"steam_aid": steamAID,
-		//})
-		global.ExpireDataChannel <- msg
+		zap.S().Infof("write expire data channel %v", map[string]interface{}{
+			"ids":       param.Ids,
+			"steam_aid": steamAID,
+		})
+		global.ExpireDataChannel1 <- msg
 	}
 
 	zap.S().Infof("生产任务完成，本次共读取 %d 条数据", count)

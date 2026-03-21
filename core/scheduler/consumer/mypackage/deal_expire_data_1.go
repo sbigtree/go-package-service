@@ -17,6 +17,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
+	"math/rand"
 	"strconv"
 	"time"
 )
@@ -34,6 +35,7 @@ type TradeTask struct {
 	Amount         string
 	PackID         string
 	CategoryName   string
+	ObjectID       primitive.ObjectID //mongo表my_inventory_pack中主键id
 }
 
 type PartSteamAccount struct {
@@ -77,7 +79,7 @@ func prepareTradeTasksBatch(
 	ids []primitive.ObjectID,
 	realTimeAssetIDMap map[string]bool,
 	logId string,
-) ([]*TradeTask, []primitive.ObjectID, error) {
+) ([]TradeTask, []string, error) {
 
 	start := time.Now()
 	collection := global.MongoDB.Collection("my_inventory_pack")
@@ -106,9 +108,9 @@ func prepareTradeTasksBatch(
 	}
 
 	// 3️⃣ 遍历 ids 构建 TradeTask
-	tradeTaskMap := make([]*TradeTask, 0, len(ids))
-	objectIds := make([]primitive.ObjectID, 0, len(ids))
+	tradeTaskMap := make([]TradeTask, 0, len(ids))
 	now := time.Now().Unix()
+	assets := make([]string, 0, len(ids))
 	for _, id := range ids {
 		result, ok := packMap[id]
 		if !ok {
@@ -133,7 +135,7 @@ func prepareTradeTasksBatch(
 		}
 
 		if _, ok := realTimeAssetIDMap[assetId]; !ok {
-			zap.S().Warnf("%s 物品:%s不在steam实时库存中，跳过", logId, result.Name)
+			zap.S().Warnf("%s 物品:%s不在steam实时库存中，跳过 assetId=%v ", logId, result.Name, assetId)
 			continue
 		}
 
@@ -158,7 +160,7 @@ func prepareTradeTasksBatch(
 			continue
 		}
 
-		task := &TradeTask{
+		task := TradeTask{
 			UserID:         result.UserId,
 			AssetID:        assetId,
 			MarketName:     result.Name,
@@ -169,20 +171,23 @@ func prepareTradeTasksBatch(
 			Amount:         "1",
 			PackID:         id.Hex(),
 			CategoryName:   categoryName,
+			ObjectID:       id,
 		}
-		objectIds = append(objectIds, id)
 		tradeTaskMap = append(tradeTaskMap, task)
+		assets = append(assets, assetId)
 		zap.S().Infof("%s prepareTradeTask 构建完成 id=%v", logId, id.Hex())
 	}
 
-	return tradeTaskMap, objectIds, nil
+	return tradeTaskMap, assets, nil
 }
 func getRealTimeInventory(tempSteamAid int32, logId string) (map[string]bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
+	//tempSteamAid = 23977
 	resp, err := global.SteamTools.InventoryCsgoServerClient.GetInventoryCsgo(ctx, &steam_tools_grpc.InventoryCsgoRequest{
 		SteamAid: tempSteamAid,
 	})
+
 	if err != nil {
 		zap.S().Errorf("%s %d 调用 SteamTools 获取库存失败  %v", logId, tempSteamAid, err)
 		return nil, err
@@ -252,31 +257,130 @@ func getTradeCount(tempSteamAid int32, logId string) bool {
 		zap.S().Warnf("%s %d 调用Node gRPC服务[GetOfferList]失败! get nil val err %+v ", logId, tempSteamAid, err)
 		return false
 	}
-
+	zap.S().Infof("%s %d beyond SendOffer limit  %v", logId, tempSteamAid, len(offerResp.Data.TradeOffersSent))
 	if len(offerResp.Data.TradeOffersSent) >= 5 {
-		zap.S().Infof("%s %d beyond SendOffer limit %d", logId, tempSteamAid, tempSteamAid)
+		zap.S().Infof("%s %d beyond SendOffer limit  %v", logId, tempSteamAid, offerResp.Data.TradeOffersSent)
 		return false
 	}
 
 	return true
 }
 
-func DealExpireData(_event event.EventMsg) error {
+// 随机获取一个可用账号
+func getRandomSteamAccount(accounts []models.SteamAccount) (*models.SteamAccount, error) {
+	if len(accounts) == 0 {
+		return nil, fmt.Errorf("empty steam accounts")
+	}
+	// 随机种子（避免每次一样）
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	// 打乱顺序（推荐，比直接取随机 index 更安全）
+	r.Shuffle(len(accounts), func(i, j int) {
+		accounts[i], accounts[j] = accounts[j], accounts[i]
+	})
+	// 找第一个可用的
+	for i := range accounts {
+		if accounts[i].Steamid == "" {
+			continue
+		}
+		// TradeURL 为空就补
+		if accounts[i].TradeURL == "" {
+			url, err := reGetTradeUrl(accounts[i].TradeURL, int32(accounts[i].ID))
+			if err != nil {
+				continue // 换下一个
+			}
+			accounts[i].TradeURL = url
+		}
+		return &accounts[i], nil
+	}
+	return nil, fmt.Errorf("no valid steam account found")
+}
+
+func DealExpireData1(_event event.EventMsg) error {
 	var params upackage.DealExpireDataParam
 	err := json.Unmarshal(_event.Params, &params)
 	if err != nil {
-		zap.S().Error("事件 FinalDispose 解析消息参数失败", err)
+		zap.S().Error("事件 DealExpireData1 解析消息参数失败", err)
 		return err
+	}
+
+	if len(params.Ids) == 0 || params.SteamAID == 0 {
+		zap.S().Warnf(" DealExpireData1 Ids=%v SteamAID=%v", len(params.Ids), params.SteamAID)
+		return nil
 	}
 
 	logId := fmt.Sprintf(" DealExpireData SteamAID=%v ", params.SteamAID)
 
+	//查中转账号配置表中数据
+	var userGroups []models.InventoryPackUserGroup
+	if err := global.DB.Model(&models.InventoryPackUserGroup{}).Find(&userGroups).Error; err != nil {
+		zap.S().Errorf("%s select user_groups table error %v", logId, err)
+		return nil
+	}
+	zap.S().Infof("%s 当前usergroup info steamAid=%d userGroups=%d", logId, params.SteamAID, len(userGroups))
+
+	groupIds := make([]int, 0, len(userGroups))
+	for _, g := range userGroups {
+		groupIds = append(groupIds, g.GroupID)
+	}
+
+	zap.S().Infof("%s 当前groupIds info steamAid=%d groupIds=%v", logId, params.SteamAID, groupIds)
+	if len(groupIds) == 0 {
+		zap.S().Errorf("%s get empty group id", logId)
+		return nil
+	}
+
+	//通过上面查中转账号配置表的组id 再差steam账号表中的steamid行记录
+	var tempSteamAccounts []models.SteamAccount
+	if err := global.DB.Model(&models.SteamAccount{}).
+		Where("group_id in ?", groupIds).
+		Where("steamid IS NOT NULL AND steamid != ''").
+		Find(&tempSteamAccounts).Error; err != nil {
+		zap.S().Errorf("%s check user_groups table error %v %v", logId, err, groupIds)
+		return nil
+	}
+	zap.S().Infof("%s tempSteamAccounts info steamAid=%d group_id=%v len(tempSteamAccounts)=%d", logId, params.SteamAID, groupIds, len(tempSteamAccounts))
+	if len(tempSteamAccounts) == 0 {
+		zap.S().Errorf("%s get empty transfer result groupIds=%v", logId, groupIds)
+		return nil
+	}
+
+	//获取随机账号
+	randomAccount, err := getRandomSteamAccount(tempSteamAccounts)
+	if err != nil {
+		zap.S().Warnf("%s get random steamAccount error groupIds=%v", logId, groupIds)
+		return nil
+	}
+
 	//检查卖家用户状态
 	sellerStatus := checkGameSellerStatus(logId, int(params.SteamAID))
 	if !sellerStatus {
-		zap.S().Errorf(" checkGameSellerStatus the  SteamAID forbid %+v", params.SteamAID)
+		zap.S().Errorf("%s checkGameSellerStatus the  SteamAID forbid %+v", params.SteamAID)
 		return nil
 	}
+
+	receiveSteamAid, err := strconv.Atoi(randomAccount.Steamid)
+	if err != nil {
+		zap.S().Warnf("%s randomAccount.Steamid str to int err err=%v steamAid=%s", logId, err, randomAccount.Steamid)
+		return err
+	}
+
+	req := &steam_tools_grpc.InventoryCsgoRequest{
+		SteamAid: int32(receiveSteamAid),
+	}
+	//查中转账号库存数量
+	res, err := global.SteamTools.InventoryCsgoServerClient.GetInventoryCsgo(context.Background(), req)
+	if err != nil || res == nil || res.Data == nil || !res.GetSuccess() {
+		zap.S().Warnf("%s GetInventoryCsgo ret err SteamAid=%v res=%v", logId, randomAccount.Steamid, res)
+		return nil
+	}
+
+	assetsLen := 0
+	if res.Data.Assets != nil {
+		assetsLen = len(res.Data.Assets)
+	}
+
+	leftAssetsNum := upackage.TotalAssetsNum - assetsLen
+	zap.S().Infof("%s current assets leftnum=%d assemAid=%s", logId, leftAssetsNum, randomAccount)
 
 	zap.S().Infof("%s", logId)
 	if !getTradeCount(params.SteamAID, logId) {
@@ -290,19 +394,11 @@ func DealExpireData(_event event.EventMsg) error {
 		zap.S().Errorf("%+v getRealTimeInventory data err %+v", params.SteamAID, err)
 		return err
 	}
-	zap.S().Infof("logID = %s will execute logid count=%v", logId, len(params.Ids))
-	tradeTaskMap, objectIds, err := prepareTradeTasksBatch(params.Ids, realTimeAssetIDMap, logId)
+	zap.S().Infof("getRealTimeInventory %v", realTimeAssetIDMap)
+	tasks, assets, err := prepareTradeTasksBatch(params.Ids, realTimeAssetIDMap, logId)
 	if err != nil {
 		zap.S().Errorf("%s prepareTradeTasksBatch error %+v", logId, err)
 		return err
-	}
-	// 转成切片和 objectIds
-	tasks := make([]TradeTask, 0, len(tradeTaskMap))
-
-	for _, task := range tradeTaskMap {
-		if task != nil {
-			tasks = append(tasks, *task)
-		}
 	}
 
 	zap.S().Infof("%s current task num %d", logId, len(tasks))
@@ -310,12 +406,36 @@ func DealExpireData(_event event.EventMsg) error {
 		zap.S().Warnf("%s 没有可执行的任务 steamAid=%d", logId, params.SteamAID)
 		return nil
 	}
-	zap.S().Infof("%s current task num %d", logId, len(tasks))
+	zap.S().Infof("assets=%v", assets)
+	if len(assets) == 0 {
+		zap.S().Infof("%s assets empty", logId)
+		return nil
+	}
+	//查是否有交易中的数据
+	var InTransLogs []models.InventoryPackTradeTransferLog
+	if err := global.DB.Model(&models.InventoryPackTradeTransferLog{}).
+		Where("offer_status = 2 and asset_id in ?", assets).Find(&InTransLogs).Error; err != nil {
+		zap.S().Errorf("%s get InventoryPackTradeTransferLog ret err %v ", logId, err)
+		return nil
+	}
+
+	assetsMap := make(map[string]struct{}, len(InTransLogs))
+	for _, item := range InTransLogs {
+		assetsMap[item.AssetID] = struct{}{}
+	}
 
 	myItem := make([]*steam_tools_grpc.OfferSendOfferRequest_TradeItem, 0, len(tasks))
-
+	objectIds := make([]primitive.ObjectID, 0, len(tasks))
 	for _, task := range tasks {
-		itemData := steam_tools_grpc.OfferSendOfferRequest_TradeItem{
+		if _, exist := assetsMap[task.AssetID]; exist {
+			continue
+		}
+		//当发起报价的资产数量大于用户可使用的资产数量，那就中断当下的遍历，直接发起报价
+		if len(myItem) > leftAssetsNum {
+			break
+		}
+		objectIds = append(objectIds, task.ObjectID)
+		itemData := &steam_tools_grpc.OfferSendOfferRequest_TradeItem{
 			Amount:  task.Amount,
 			Assetid: task.AssetID,
 			Game: &steam_tools_grpc.OfferSendOfferRequest_Game{
@@ -323,101 +443,43 @@ func DealExpireData(_event event.EventMsg) error {
 				ContextId: 2,
 			},
 		}
-		myItem = append(myItem, &itemData)
+		myItem = append(myItem, itemData)
+	}
+
+	if len(myItem) == 0 {
+		zap.S().Infof("%s empty myItem sell steamaid=%v  receive steamaid=%v", logId, params.SteamAID, randomAccount.Steamid)
+		return nil
 	}
 
 	zap.S().Infof("%s 当前可执行的任务信息 steamAid=%d tasks=%d", logId, params.SteamAID, len(tasks))
 
-	//查表user_groups中数据
-	var userGroups []models.UserGroup
-	if err := global.DB.Model(&models.UserGroup{}).Find(&userGroups).Error; err != nil {
-		zap.S().Errorf("%s select user_groups table error %v", logId, err)
-		return nil
-	}
-	zap.S().Infof("%s 当前usergroup info steamAid=%d userGroups=%d", logId, params.SteamAID, len(userGroups))
-
-	groupIds := make([]int32, 0, len(userGroups))
-	for _, g := range userGroups {
-		groupIds = append(groupIds, g.GroupID)
-	}
-
-	zap.S().Infof("%s 当前groupIds info steamAid=%d groupIds=%d", logId, params.SteamAID, len(groupIds))
-	if len(groupIds) == 0 {
-		zap.S().Errorf("%s get empty group id", logId)
-		return nil
-	}
-
-	var tempSteamAccounts []models.SteamAccount
-	if err := global.DB.Model(&models.SteamAccount{}).Where("group_id in ?", groupIds).Find(&tempSteamAccounts).Error; err != nil {
-		zap.S().Errorf("%s check user_groups table error %v %v", logId, err, groupIds)
-		return nil
-	}
-	zap.S().Infof("%s tempSteamAccounts info steamAid=%d tempSteamAccounts=%d", logId, params.SteamAID, len(tempSteamAccounts))
-	if len(tempSteamAccounts) == 0 {
-		zap.S().Errorf("%s get empty transfer result groupIds=%v", logId, groupIds)
-		return nil
-	}
-
-	ttSteamAccount := make(map[string]struct{}, len(tempSteamAccounts))
-	executeSteamAccount := make([]PartSteamAccount, 0, len(tempSteamAccounts))
-	for _, tempSteamAccount := range tempSteamAccounts {
-		if tempSteamAccount.Steamid == "" {
-			continue
-		}
-		if _, ok := ttSteamAccount[tempSteamAccount.Steamid]; !ok {
-			executeSteamAccount = append(executeSteamAccount, PartSteamAccount{
-				Steamid:  tempSteamAccount.Steamid,
-				TradeURL: tempSteamAccount.TradeURL,
-			})
-			ttSteamAccount[tempSteamAccount.Steamid] = struct{}{}
-		}
-	}
-
-	if len(executeSteamAccount) == 0 {
-		zap.S().Errorf("%s executeSteamAccount empty", logId)
-		return nil
-	}
-
-	transferSteamId, err := strconv.Atoi(executeSteamAccount[0].Steamid)
-	if err != nil {
-		zap.S().Infof("%s executeSteamAccount TradeURL string to int error Steamid=%v err=%v", logId, executeSteamAccount[0].Steamid, err)
-		return err
-	}
-
-	if executeSteamAccount[0].TradeURL == "" {
-		executeSteamAccount[0].TradeURL, err = reGetTradeUrl(executeSteamAccount[0].TradeURL, int32(transferSteamId))
-		if err != nil {
-			zap.S().Infof("SteamAid %s TradeUrl %s empty val", executeSteamAccount[0].Steamid, executeSteamAccount[0].TradeURL)
-			return nil
-		}
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	response, err := global.SteamTools.OfferServerClient.SendOffer(ctx, &steam_tools_grpc.OfferSendOfferRequest{
-		SteamAid:    int32(transferSteamId),
-		TradeUrl:    executeSteamAccount[0].TradeURL,
+		SteamAid:    params.SteamAID,
+		TradeUrl:    randomAccount.TradeURL,
 		MyItems:     myItem,
 		ThemItems:   []*steam_tools_grpc.OfferSendOfferRequest_TradeItem{},
 		AutoConfirm: 1,
 	})
-
+	zap.S().Infof("SendOffer %v, %v %v %v", response, err, params.SteamAID, randomAccount.TradeURL)
 	if err != nil {
 		zap.S().Errorf("%s 调用steam_tools服务失败 response=%+v steamAid=%d err=%v",
 			logId,
 			response,
-			transferSteamId,
+			randomAccount.ID,
 			err,
 		)
 		return err
 	}
 	if response == nil || response.Data == nil || response.Data.Tradeofferid == nil || *response.Data.Tradeofferid == "" {
-		zap.S().Errorf("%s send offer response invalid steamAid=%d", logId, transferSteamId)
+		zap.S().Errorf("%s send offer response invalid steamAid=%d", logId, randomAccount.ID)
 		return errors.New("send offer response invalid")
 	}
 	var logs []models.InventoryPackTradeTransferLog
 	for _, task := range tasks {
 		logs = append(logs, models.InventoryPackTradeTransferLog{
-			UserID:           task.UserID,
+			BuyUserID:        task.UserID,
 			OfferID:          *response.Data.Tradeofferid,
 			OfferStatus:      2,
 			AssetID:          task.AssetID,
@@ -426,8 +488,8 @@ func DealExpireData(_event event.EventMsg) error {
 			Img:              task.Img,
 			AppID:            task.AppID,
 			SteamAID:         params.SteamAID,
-			ReceivedSteamAID: int32(transferSteamId),
-			ReceivedTradeURL: executeSteamAccount[0].TradeURL,
+			ReceivedSteamAID: int32(randomAccount.ID),
+			ReceivedTradeURL: randomAccount.TradeURL,
 			PackID:           task.PackID,
 			CategoryName:     task.CategoryName,
 		})
@@ -443,13 +505,13 @@ func DealExpireData(_event event.EventMsg) error {
 	}
 
 	if len(objectIds) > 0 {
-		//写通道数据
+		//给通道写发送报价成功的数据
 		msg := event.NewEventMsg(map[string]interface{}{
 			"ids":       objectIds,
-			"steam_aid": int32(transferSteamId),
+			"steam_aid": int32(randomAccount.ID),
 			"offer_id":  *response.Data.Tradeofferid, //交易id
 		})
-		global.CheckSendOfferChannel <- msg
+		global.ExpireDataChannel2 <- msg
 	}
 
 	return nil

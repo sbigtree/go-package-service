@@ -352,6 +352,10 @@ github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260319042217-a5674e018ac9 h1:ecPNj
 github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260319042217-a5674e018ac9/go.mod h1:P+OrMcloB+2SFXRx+DVMxddYw5tx+nSQDrIT1TQU0o4=
 github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260319070133-21cd475eb1bb h1:LjDljCJL0wrDMZ7Vn86yIxnrF841a+cfz2Pox13tb2I=
 github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260319070133-21cd475eb1bb/go.mod h1:P+OrMcloB+2SFXRx+DVMxddYw5tx+nSQDrIT1TQU0o4=
+github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260320100101-9ab7d8d545e7 h1:cqM7u1cZ1oc/FZl3T2DlR4h8QwbVCXyAXxtAUJhD76A=
+github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260320100101-9ab7d8d545e7/go.mod h1:P+OrMcloB+2SFXRx+DVMxddYw5tx+nSQDrIT1TQU0o4=
+github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260320151026-1e2238947d9d h1:UdtgOqbRK7m66XBSqrqb4f42a7Qdw0E8ciDiTo7Gahc=
+github.com/sbigtree/go-db-model/v2 v2.1.2-0.20260320151026-1e2238947d9d/go.mod h1:P+OrMcloB+2SFXRx+DVMxddYw5tx+nSQDrIT1TQU0o4=
 github.com/sbigtree/go-protobufs v0.0.0-20260311025940-bbf760d85cdd h1:fSaI1W8ULjsNBA6A/KQ/fSjrOZpuxrW719kdYF8Mi5s=
 github.com/sbigtree/go-protobufs v0.0.0-20260311025940-bbf760d85cdd/go.mod h1:cQjQDvoDNuqmTiJCmGzUauCgeQbjQSdmwD6uciwmvFw=
 github.com/sbigtree/steam-tools-grpc v0.0.0-20260204040026-abc7eda39c94 h1:3LjT/q/yFh5zysxLldbcq0/arJzoINoQuFzizpn8tkg=

@@ -22,8 +22,8 @@ func init() {
 	event.InitSnowflake(1)
 	//初始化总路由
 	event.InitRouter()
-	//初始化定时任务
-	event.InitScheduler()
 	//初始化steam_tools服务连接
 	event.InitSteamToolsClient()
+	//初始化定时任务
+	event.InitScheduler()
 }
